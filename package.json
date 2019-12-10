@@ -1,7 +1,7 @@
 {
 	"name": "fashion-scraper-macys",
 	"version": "0.0.1",
-	"description": "Apify actor for scraping macys.com.",
+	"description": "Apify actor for scraping www.macys.com.",
 	"dependencies": {
 		"apify": "^0.17.0"
 	},
@@ -17,6 +17,6 @@
 	"license": "Apache-2.0",
     "repository": {
         "type": "git",
-        "url": "https://github.com/gustavotr/actor-fashion-scraper-macys"
+        "url": "https://github.com/gustavotr/actor-macys-scraper"
     }
 }
