@@ -1,66 +1,45 @@
+// This is the main Node.js source code file of your actor.
+// It is referenced from the "scripts" section of the package.json file,
+// so that it can be started by running "npm start".
+
+// Include Apify SDK. For more information, see https://sdk.apify.com/
 const Apify = require('apify');
 
-const { log } = Apify.utils;
-log.setLevel(log.LEVELS.DEBUG);
+const rp = require('request-promise');
 
 Apify.main(async () => {
+    // Get input of the actor (here only for demonstration purposes).
+    // If you'd like to have your input checked and have Apify display
+    // a user interface for it, add INPUT_SCHEMA.json file to your actor.
+    // For more information, see https://apify.com/docs/actor/input-schema
     const input = await Apify.getInput();
-    const { proxy, startUrls } = input;
+    console.log('Input:');
+    console.dir(input);
 
-    const requestQueue = await Apify.openRequestQueue();
-    await Promise.all(startUrls.map(url => requestQueue.addRequest({ url, userData: { type: 'startUrl' } })));
+    if (!input || !input.sources) throw new Error('Input must be a JSON object with the "sources" field!');
 
-    const crawler = new Apify.CheerioCrawler({
-        requestQueue,
-        ...proxy,
-        minConcurrency: 10,
-        maxConcurrency: 50,
+    const requestList = await Apify.openRequestList('my-request-list', input.sources);
 
-        maxRequestRetries: 3,
-
-        handlePageTimeoutSecs: 60,
-
-        handlePageFunction: async ({ request, body, $ }) => {
-            console.log(`Processing ${request.url}...`);
-
-            const title = $('title').text();
-            if (title === 'Access Denied') {
-                throw new Error('Access Denied');
-            }
-            const { type } = request.userData;
-
-            if (type === 'startUrl') {
-                const departments = $('#shopByDepartmentDropdownList ul li a');
-                Object.keys(departments).forEach((key) => {
-                    const item = departments[key];
-                    if (item.type === 'tag' && item.name === 'a') {
-                        const url = `https://www.macys.com${item.attribs.href}`;
-                        const name = $(item).text();
-                        log.debug(name);
-                        log.debug(url);
-                        requestQueue.addRequest({ url, userDate: { type: 'department', name } });
-                    }
-                });
-            }
-
-            if (type === 'department') {
-                log.debug('Departmanet', request.userData.name);
-            }
-            // departments.each(item => console.log(item));
-            // await Apify.pushData({
-            //     url: request.url,
-            //     title,
-            //     h1texts,
-            //     body,
-            // });
+    // Create a basic crawler that will use request-promise to download
+    // web pages from a given list of URLs
+    const basicCrawler = new Apify.BasicCrawler({
+        requestList,
+        handleRequestFunction: async ({ request }) => {
+            await Apify.pushData({
+                request,
+                finishedAt: new Date(),
+                html: await rp(request.url),
+                '#debug': Apify.utils.createRequestDebugInfo(request),
+            });
         },
 
         handleFailedRequestFunction: async ({ request }) => {
-            console.log(`Request ${request.url} failed 3 times.`);
+            await Apify.pushData({
+                '#isFailed': true,
+                '#debug': Apify.utils.createRequestDebugInfo(request),
+            });
         },
     });
 
-    await crawler.run();
-
-    console.log('Crawler finished.');
+    await basicCrawler.run();
 });
