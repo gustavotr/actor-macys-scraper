@@ -1,45 +1,78 @@
-// This is the main Node.js source code file of your actor.
-// It is referenced from the "scripts" section of the package.json file,
-// so that it can be started by running "npm start".
-
-// Include Apify SDK. For more information, see https://sdk.apify.com/
 const Apify = require('apify');
 
-const rp = require('request-promise');
+const { log } = Apify.utils;
+log.setLevel(log.LEVELS.DEBUG);
 
 Apify.main(async () => {
-    // Get input of the actor (here only for demonstration purposes).
-    // If you'd like to have your input checked and have Apify display
-    // a user interface for it, add INPUT_SCHEMA.json file to your actor.
-    // For more information, see https://apify.com/docs/actor/input-schema
     const input = await Apify.getInput();
     console.log('Input:');
     console.dir(input);
 
-    if (!input || !input.sources) throw new Error('Input must be a JSON object with the "sources" field!');
+    const { proxy, startUrls } = input;
 
-    const requestList = await Apify.openRequestList('my-request-list', input.sources);
+    const requestQueue = await Apify.openRequestQueue();
+    await Promise.all(startUrls.map(url => requestQueue.addRequest({ url, userData: { type: 'startUrl' } })));
 
-    // Create a basic crawler that will use request-promise to download
-    // web pages from a given list of URLs
-    const basicCrawler = new Apify.BasicCrawler({
-        requestList,
-        handleRequestFunction: async ({ request }) => {
-            await Apify.pushData({
-                request,
-                finishedAt: new Date(),
-                html: await rp(request.url),
-                '#debug': Apify.utils.createRequestDebugInfo(request),
-            });
+    const sessionPool = await Apify.openSessionPool({
+        maxPoolSize: 25,
+        sessionOptions: {
+            maxAgeSecs: 10,
+            maxUsageCount: 150,
+        },
+        persistStateKeyValueStoreId: 'SESSIONS',
+        persistStateKey: 'my-session-pool',
+    });
+
+    await sessionPool.initialize();
+
+    const crawler = new Apify.CheerioCrawler({
+        requestQueue,
+        ...proxy,
+        minConcurrency: 10,
+        maxConcurrency: 50,
+
+        prepareRequestFunction: ({ request }) => {
+            request.headers = {
+                'User-Agent': Apify.utils.getRandomUserAgent(),
+            };
+            return request;
+        },
+
+        handlePageFunction: async ({ request, body, $ }) => {
+            console.log(`Processing ${request.url}...`);
+
+            const title = $('title').text();
+            if (title === 'Access Denied') {
+                throw new Error('Access Denied');
+            }
+
+            console.log(body);
+            const { type } = request.userData;
+
+            if (type === 'startUrl') {
+                const departments = $('#shopByDepartmentDropdownList ul li a');
+                Object.keys(departments).forEach((key) => {
+                    const item = departments[key];
+                    if (item.type === 'tag' && item.name === 'a') {
+                        const url = `https://www.macys.com${item.attribs.href}`;
+                        const name = $(item).text();
+                        log.debug(name);
+                        log.debug(url);
+                        requestQueue.addRequest({ url, userDate: { type: 'department', name } });
+                    }
+                });
+            }
+
+            if (type === 'department') {
+                log.debug('Departmanet', request.userData.name);
+            }
+
         },
 
         handleFailedRequestFunction: async ({ request }) => {
-            await Apify.pushData({
-                '#isFailed': true,
-                '#debug': Apify.utils.createRequestDebugInfo(request),
-            });
+            console.log(`Request ${request.url} failed too many times`);
         },
     });
 
-    await basicCrawler.run();
+    await crawler.run();
 });

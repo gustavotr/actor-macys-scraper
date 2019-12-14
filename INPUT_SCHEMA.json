@@ -82,6 +82,10 @@
                 "useApifyProxy": true,
                 "apifyProxyGroups": []
             },
+            "default": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": []
+            },
             "editor": "proxy"
         }
     },
