@@ -3,7 +3,6 @@ const cheerio = require('cheerio');
 
 const { parseMainPage, parseCategory, getUrlType, parseProduct, EnumURLTypes } = require('./tools');
 
-
 const { log } = Apify.utils;
 log.setLevel(log.LEVELS.DEBUG);
 

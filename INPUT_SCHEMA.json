@@ -43,6 +43,10 @@
                 "useApifyProxy": true,
                 "apifyProxyGroups": [ "SHADER" ]
             },
+            "default": {
+                "useApifyProxy": true,
+                "apifyProxyGroups": []
+            },
             "editor": "proxy"
         }
     },
