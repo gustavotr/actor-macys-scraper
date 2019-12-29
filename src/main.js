@@ -1,72 +1,63 @@
 const Apify = require('apify');
+const cheerio = require('cheerio');
+
+const { parseMainPage, parseCategory, getUrlType, parseProduct, EnumURLTypes } = require('./tools');
 
 const { log } = Apify.utils;
 log.setLevel(log.LEVELS.DEBUG);
 
 Apify.main(async () => {
     const input = await Apify.getInput();
-    console.log('Input:');
-    console.dir(input);
-
     const { proxy, startUrls } = input;
 
     const requestQueue = await Apify.openRequestQueue();
-    await Promise.all(startUrls.map(url => requestQueue.addRequest({ url, userData: { type: 'startUrl' } })));
+    await Promise.all(startUrls.map((url) => {
+        const type = getUrlType(url);
+        requestQueue.addRequest({ url, userData: { type } });
+    }));
 
-    const sessionPool = await Apify.openSessionPool({
-        maxPoolSize: 25,
-        sessionOptions: {
-            maxAgeSecs: 10,
-            maxUsageCount: 150,
-        },
-        persistStateKeyValueStoreId: 'SESSIONS',
-        persistStateKey: 'my-session-pool',
-    });
-
-    await sessionPool.initialize();
-
-    const crawler = new Apify.CheerioCrawler({
+    const crawler = new Apify.BasicCrawler({
         requestQueue,
-        ...proxy,
-        minConcurrency: 10,
-        maxConcurrency: 50,
+        useSessionPool: true,
+        maxRequestsPerCrawl: 50,
 
-        prepareRequestFunction: ({ request }) => {
-            request.headers = {
-                'User-Agent': Apify.utils.getRandomUserAgent(),
+        handleRequestFunction: async ({ request, session }) => {
+            log.info(`Processing ${request.url}...`);
+
+            const requestOptions = {
+                url: request.url,
+                proxyUrl: Apify.getApifyProxyUrl({
+                    groups: proxy.apifyProxyGroups,
+                    session: session.id,
+                }),
             };
-            return request;
-        },
-
-        handlePageFunction: async ({ request, body, $ }) => {
-            console.log(`Processing ${request.url}...`);
-
+            const { body, headers } = await Apify.utils.requestAsBrowser(requestOptions);
+            const $ = cheerio.load(body);
             const title = $('title').text();
+
             if (title === 'Access Denied') {
+                session.markBad();
                 throw new Error('Access Denied');
             }
 
-            console.log(body);
+            session.markGood();
+
             const { type } = request.userData;
 
-            if (type === 'startUrl') {
-                const departments = $('#shopByDepartmentDropdownList ul li a');
-                Object.keys(departments).forEach((key) => {
-                    const item = departments[key];
-                    if (item.type === 'tag' && item.name === 'a') {
-                        const url = `https://www.macys.com${item.attribs.href}`;
-                        const name = $(item).text();
-                        log.debug(name);
-                        log.debug(url);
-                        requestQueue.addRequest({ url, userDate: { type: 'department', name } });
-                    }
-                });
+            if (type === EnumURLTypes.START_URL) {
+                log.debug('Start url...');
+                await parseMainPage({ requestQueue, $, body });
             }
 
-            if (type === 'department') {
-                log.debug('Departmanet', request.userData.name);
+            if (type === EnumURLTypes.CATEGORY) {
+                log.debug('Category url...');
+                await parseCategory({ requestQueue, $, body, userData: { ...request.userData } });
             }
 
+            if (type === EnumURLTypes.PRODUCT) {
+                log.debug('Product url...');
+                await parseProduct({ requestQueue, $, body, userData: { ...request.userData, headers } });
+            }
         },
 
         handleFailedRequestFunction: async ({ request }) => {
