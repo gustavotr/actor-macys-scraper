@@ -1,5 +1,5 @@
 const Apify = require('apify');
-const { EnumURLTypes, EnumBaseUrl } = require('./contants');
+const { EnumURLTypes, EnumBaseUrl } = require('./constants');
 
 const { log } = Apify.utils;
 log.setLevel(log.LEVELS.DEBUG);
