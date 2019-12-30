@@ -10,7 +10,7 @@
             "description": "If you already have URL(s) of page(s) you wish to scrape, you can set them here. <br /><br /><strong>This field is optional, but this field or 'Search' must be provided (or both)</strong>",
             "editor": "stringList",
             "placeholderValue": "URL",
-            "patternValue": "https:\\/\\/(www\\.)*macys\\.com\\/.+",
+            "patternValue": "https:\\/\\/(www\\.)?macys\\.com\\/?.*",
             "uniqueItems": true
         },
         "maxItems": {
