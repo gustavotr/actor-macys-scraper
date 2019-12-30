@@ -45,7 +45,7 @@ Apify.main(async () => {
             throw new Error(`'extendOutputFunction' is not valid Javascript! Error: ${e}`);
         }
         if (typeof extendOutputFunctionObj !== 'function') {
-            throw new Error('extendOutputFunction is not a function! Please fix it or use just default ouput!');
+            throw new Error('extendOutputFunction is not a function! Please fix it or use just default output!');
         }
     }
 
