@@ -8,24 +8,28 @@ const getSearchUrl = (keyword) => {
     return `${EnumBaseUrl.SEARCH}/${keyword}`;
 };
 
+const getProductIdFromURL = (productUrl) => {
+    const params = new URLSearchParams(productUrl.split('?')[1]);
+    return params.get('ID');
+};
+
 const getUrlType = (url) => {
-    let type = null;
     if (url.match(/macys\.com\/*$/)) {
-        type = EnumURLTypes.START_URL;
+        return EnumURLTypes.START_URL;
     }
 
-    if (url.match(/macys\.com(\/shop)*\/product\/.+/)) {
-        type = EnumURLTypes.PRODUCT;
+    if (url.match(/macys\.com(\/shop)?\/product\/.+/)) {
+        return EnumURLTypes.PRODUCT;
     }
 
     if (url.match(/macys\.com\/shop\/.+/)) {
-        type = EnumURLTypes.CATEGORY;
+        return EnumURLTypes.CATEGORY;
     }
     if (url.match(/macys\.com\/shop\/featured\/.+/)) {
-        type = EnumURLTypes.SEARCH;
+        return EnumURLTypes.SEARCH;
     }
 
-    return type;
+    return null;
 };
 
 const isObject = val => typeof val === 'object' && val !== null && !Array.isArray(val);
@@ -33,6 +37,7 @@ const isObject = val => typeof val === 'object' && val !== null && !Array.isArra
 module.exports = {
     getUrlType,
     getSearchUrl,
+    getProductIdFromURL,
     isObject,
     log,
 };

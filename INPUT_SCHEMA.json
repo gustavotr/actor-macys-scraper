@@ -25,12 +25,6 @@
             "description": "Here you can provide a search query which will be used to search Macys for products. <br /><br /><strong>This field is optional, but this field or 'Start Macys page URLs' must be provided (or both)</strong>",
             "editor": "textfield"
         },
-        "extendOutputFunction": {
-            "title": "Extended Output Function",
-            "type": "string",
-            "description": "Here you can write your custom javascript code to extract custom data from the page.",
-            "editor": "javascript"
-        },
         "proxy": {
             "title": "Proxy configuration",
             "type": "object",
@@ -42,10 +36,6 @@
             "default": {
                 "useApifyProxy": true,
                 "apifyProxyGroups": [ "SHADER" ]
-            },
-            "default": {
-                "useApifyProxy": true,
-                "apifyProxyGroups": []
             },
             "editor": "proxy"
         }

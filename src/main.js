@@ -2,13 +2,13 @@ const Apify = require('apify');
 const cheerio = require('cheerio');
 const safeEval = require('safe-eval');
 
-const { getUrlType, log, isObject, getSearchUrl } = require('./tools');
+const { getUrlType, log, getSearchUrl, getProductIdFromURL } = require('./tools');
 const { EnumBaseUrl, EnumURLTypes } = require('./constants');
-const { parseCategory, parseProduct, parseMainPage } = require('./parsers');
+const { parseCategory, parseMainPage } = require('./parsers');
 
 Apify.main(async () => {
     const input = await Apify.getInput();
-    const { proxy, startUrls, maxItems, search, extendOutputFunction } = input;
+    const { proxy, startUrls, maxItems, search } = input;
 
     if (!startUrls && !search) {
         throw new Error('startUrls or search parameter must be provided!');
@@ -37,18 +37,6 @@ Apify.main(async () => {
     const dataset = await Apify.openDataset();
     let { itemCount } = await dataset.getInfo();
 
-    let extendOutputFunctionObj;
-    if (typeof extendOutputFunction === 'string' && extendOutputFunction.trim() !== '') {
-        try {
-            extendOutputFunctionObj = safeEval(extendOutputFunction);
-        } catch (e) {
-            throw new Error(`'extendOutputFunction' is not valid Javascript! Error: ${e}`);
-        }
-        if (typeof extendOutputFunctionObj !== 'function') {
-            throw new Error('extendOutputFunction is not a function! Please fix it or use just default output!');
-        }
-    }
-
     const crawler = new Apify.BasicCrawler({
         requestQueue,
         useSessionPool: true,
@@ -69,42 +57,57 @@ Apify.main(async () => {
                     session: session.id,
                 }),
             };
-            const { body, headers } = await Apify.utils.requestAsBrowser(requestOptions);
-            const $ = cheerio.load(body);
-            const title = $('title').text();
-
-            if (title === 'Access Denied') {
-                session.markBad();
-                throw new Error('Access Denied');
-            }
-
-            session.markGood();
 
             const { type } = request.userData;
 
-            if (type === EnumURLTypes.START_URL) {
-                log.debug('Start url...');
-                await parseMainPage({ requestQueue, $, body });
-            }
-
-            if (type === EnumURLTypes.CATEGORY || type === EnumURLTypes.SEARCH) {
-                log.debug('Category or Search url...');
-                await parseCategory({ requestQueue, $, body, userData: { ...request.userData } });
-            }
-
             if (type === EnumURLTypes.PRODUCT) {
-                log.debug('Product url...');
-                let userResult;
-                if (extendOutputFunction) {
-                    userResult = await extendOutputFunctionObj($);
-
-                    if (!isObject(userResult)) {
-                        log.error('extendOutputFunction has to return an object!!!');
-                        process.exit(1);
-                    }
-                }
-                await parseProduct({ requestQueue, $, body, userData: { ...request.userData, headers }, userResult });
+                const productId = getProductIdFromURL(request.url);
+                const url = `https://www.macys.com/xapi/digital/v1/product/${
+                    productId
+                }?size=small&clientId=PROS&_shoppingMode=SITE&_customerState=GUEST&currencyCode=USD&_regionCode=US`;
+                const { body: product } = await Apify.utils.requestAsBrowser({
+                    url,
+                    abortFunction: () => false,
+                    proxyUrl: Apify.getApifyProxyUrl({
+                        groups: proxy.apifyProxyGroups,
+                        session: session.id,
+                    }),
+                    followRedirect: false,
+                    json: true,
+                });
+                await Apify.pushData(product);
                 itemCount++;
+            } else {
+                const { body } = await Apify.utils.requestAsBrowser(requestOptions);
+                const $ = cheerio.load(body);
+                const title = $('title')
+                    .text();
+
+                if (title === 'Access Denied') {
+                    log.warning('Access Denied');
+                }
+
+                session.markGood();
+
+
+                if (type === EnumURLTypes.START_URL) {
+                    log.debug('Start url...');
+                    await parseMainPage({
+                        requestQueue,
+                        $,
+                        body,
+                    });
+                }
+
+                if (type === EnumURLTypes.CATEGORY || type === EnumURLTypes.SEARCH) {
+                    log.debug('Category or Search url...');
+                    await parseCategory({
+                        requestQueue,
+                        $,
+                        body,
+                        userData: { ...request.userData },
+                    });
+                }
             }
         },
 
