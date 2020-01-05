@@ -3,8 +3,8 @@ const cheerio = require('cheerio');
 const safeEval = require('safe-eval');
 
 const { getUrlType, log, getSearchUrl, getProductIdFromURL } = require('./tools');
-const { EnumBaseUrl, EnumURLTypes } = require('./constants');
-const { parseCategory, parseMainPage } = require('./parsers');
+const { BaseUrls, EnumURLTypes } = require('./constants');
+const { parseCategory, parseMainPage, parseProduct } = require('./parsers');
 
 Apify.main(async () => {
     const input = await Apify.getInput();
@@ -15,7 +15,7 @@ Apify.main(async () => {
     }
 
     if (startUrls && !startUrls.length && !search) {
-        startUrls.push(EnumBaseUrl.HOME);
+        startUrls.push(BaseUrls.HOME);
     }
 
     const requestQueue = await Apify.openRequestQueue();
@@ -75,7 +75,7 @@ Apify.main(async () => {
                     followRedirect: false,
                     json: true,
                 });
-                await Apify.pushData(product);
+                await parseProduct(product);
                 itemCount++;
             } else {
                 const { body } = await Apify.utils.requestAsBrowser(requestOptions);

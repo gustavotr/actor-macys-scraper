@@ -1,5 +1,5 @@
 const Apify = require('apify');
-const { EnumURLTypes } = require('./constants');
+const { EnumURLTypes, BaseUrls } = require('./constants');
 const { log } = require('./tools');
 
 
@@ -54,25 +54,34 @@ const parseCategory = async ({ requestQueue, $, userData }) => {
     }
 };
 
-const parseProduct = async ({ $, userResult }) => {
-    const data = JSON.parse($('#productMktData').html());
-    for (const offer of data.offers) {
-        const product = {
-            ...data,
-            offers: undefined,
-            brand: data.brand.name,
-            price: offer.price,
-            currency: offer.priceCurrency,
-            availability: offer.availability,
-            priceValidUntil: 'Sale ends 1/1/20',
-            color: offer.itemOffered.color,
-            SKU: offer.SKU,
+const parseProduct = async (product) => {
+    const { meta: { analytics: { data } }, product: prod } = product;
+    const colors = prod[0].traits.colors.colorMap;
+    await Promise.all(Object.values(colors).map(async (color) => {
+        const prices = color.pricing.price.tieredPrice;
+        const price = prices.filter(({ label }) => label.includes('Orig'))[0];
+        const salePrice = prices.filter(({ label }) => label.includes('Sale'))[0];
+        const p = {
+            id: data.product_id[0],
+            name: data.product_name[0],
+            rating: data.product_rating[0],
+            brand: data.product_brand[0],
+            url: BaseUrls.HOME + prod[0].identifier.productUrl,
+            category: prod[0].identifier.toLevelCategoryName,
+            description: prod[0].detail.description,
+            color: color.name,
+            images: color.imagery.images.map((image) => {
+                return BaseUrls.IMAGE + image.filePath;
+            }),
+            sizes: color.sizes,
+            price: price ? price.values[0].value : prices[0].values[0].value,
+            salePrice: salePrice ? salePrice.values[0].value : null,
+            extra: {
+                apiData: product,
+            },
         };
-
-        Object.assign(product, userResult);
-
-        await Apify.pushData(product);
-    }
+        return Apify.pushData(p);
+    }));
 };
 
 module.exports = {
