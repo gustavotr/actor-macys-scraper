@@ -1,6 +1,5 @@
 const Apify = require('apify');
 const cheerio = require('cheerio');
-const safeEval = require('safe-eval');
 
 const { getUrlType, log, getSearchUrl, getProductIdFromURL } = require('./tools');
 const { BaseUrls, EnumURLTypes } = require('./constants');
@@ -8,7 +7,7 @@ const { parseCategory, parseMainPage, parseProduct } = require('./parsers');
 
 Apify.main(async () => {
     const input = await Apify.getInput();
-    const { proxy, startUrls, maxItems, search } = input;
+    const { proxy, startUrls, maxItems, search, apiData } = input;
 
     if (!startUrls && !search) {
         throw new Error('startUrls or search parameter must be provided!');
@@ -75,7 +74,7 @@ Apify.main(async () => {
                     followRedirect: false,
                     json: true,
                 });
-                await parseProduct(product);
+                await parseProduct(product, apiData);
                 itemCount++;
             } else {
                 const { body } = await Apify.utils.requestAsBrowser(requestOptions);

@@ -38,6 +38,13 @@
                 "apifyProxyGroups": [ "SHADER" ]
             },
             "editor": "proxy"
+        },
+        "apiData":{
+            "title":"API Data",
+            "type":"boolean",
+            "description":"Includes data from API",
+            "default": false,
+            "groupCaption": "Extra"
         }
     },
     "required": [

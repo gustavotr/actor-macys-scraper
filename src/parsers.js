@@ -60,7 +60,7 @@ const parseCategory = async ({ requestQueue, $, userData }) => {
     }
 };
 
-const parseProduct = async (product) => {
+const parseProduct = async (product, apiData) => {
     const { meta: { analytics: { data } }, product: prod } = product;
     const colors = prod[0].traits.colors.colorMap;
     await Promise.all(Object.values(colors)
@@ -83,9 +83,7 @@ const parseProduct = async (product) => {
                 sizes: color.sizes,
                 price: price ? price.values[0].value : prices[0].values[0].value,
                 salePrice: salePrice ? salePrice.values[0].value : null,
-                extra: {
-                    apiData: product,
-                },
+                apiData: apiData ? product : undefined,
             };
             return Apify.pushData(p);
         }));
