@@ -27,7 +27,7 @@ Apify.main(async () => {
     if (startUrls && startUrls.length) {
         await Promise.all(startUrls.map((url) => {
             const type = getUrlType(url);
-            requestQueue.addRequest({
+            return requestQueue.addRequest({
                 url,
                 userData: { type },
             });
