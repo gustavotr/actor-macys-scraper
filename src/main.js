@@ -1,13 +1,18 @@
 const Apify = require('apify');
 const cheerio = require('cheerio');
 
-const { getUrlType, log, getSearchUrl, getProductIdFromURL } = require('./tools');
+const { getUrlType, log, getSearchUrl, getProductIdFromURL, setDebugMode } = require('./tools');
 const { BaseUrls, EnumURLTypes } = require('./constants');
 const { parseCategory, parseMainPage, parseProduct } = require('./parsers');
+const { createProxyWithValidation } = require('./proxy-validation');
 
 Apify.main(async () => {
     const input = await Apify.getInput();
-    const { proxy, startUrls, maxItems, search, apiData } = input;
+    const { proxy, startUrls, maxItems, search, apiData, debugMode } = input;
+
+    if (debugMode) {
+        setDebugMode();
+    }
 
     if (!startUrls && !search) {
         throw new Error('startUrls or search parameter must be provided!');
@@ -36,6 +41,10 @@ Apify.main(async () => {
     const dataset = await Apify.openDataset();
     let { itemCount } = await dataset.getInfo();
 
+    const proxyConfiguration = await createProxyWithValidation({
+        proxyConfig: proxy,
+    });
+
     const crawler = new Apify.BasicCrawler({
         requestQueue,
         useSessionPool: true,
@@ -51,10 +60,7 @@ Apify.main(async () => {
 
             const requestOptions = {
                 url: request.url,
-                proxyUrl: Apify.getApifyProxyUrl({
-                    groups: proxy.apifyProxyGroups,
-                    session: session.id,
-                }),
+                proxyUrl: proxyConfiguration.newUrl(session.id),
             };
 
             const { type } = request.userData;
@@ -64,17 +70,27 @@ Apify.main(async () => {
                 const url = `https://www.macys.com/xapi/digital/v1/product/${
                     productId
                 }?size=small&clientId=PROS&_shoppingMode=SITE&_customerState=GUEST&currencyCode=USD&_regionCode=US`;
-                const { body: product } = await Apify.utils.requestAsBrowser({
+                const { body } = await Apify.utils.requestAsBrowser({
                     url,
                     abortFunction: () => false,
-                    proxyUrl: Apify.getApifyProxyUrl({
-                        groups: proxy.apifyProxyGroups,
-                        session: session.id,
-                    }),
+                    proxyUrl: proxyConfiguration.newUrl(session.id),
                     followRedirect: false,
-                    json: true,
                 });
-                await parseProduct(product, apiData);
+
+                try {
+                    const product = JSON.parse(body);
+                    await parseProduct(product, apiData);
+                } catch (err) {
+                    const $ = cheerio.load(body);
+                    const title = $('title')
+                        .text();
+
+                    if (title === 'Access Denied') {
+                        session.markBad();
+                        throw new Error('Access Denied');
+                    }
+                    throw new Error(err);
+                }
                 itemCount++;
             } else {
                 const { body } = await Apify.utils.requestAsBrowser(requestOptions);
@@ -83,11 +99,10 @@ Apify.main(async () => {
                     .text();
 
                 if (title === 'Access Denied') {
-                    log.warning('Access Denied');
+                    log.error('Access Denied');
                 }
 
                 session.markGood();
-
 
                 if (type === EnumURLTypes.START_URL) {
                     log.debug('Start url...');

@@ -2,8 +2,8 @@ const Apify = require('apify');
 const { EnumURLTypes, BaseUrls } = require('./constants');
 const { log } = require('./tools');
 
-
 const parseMainPage = async ({ requestQueue, $ }) => {
+    log.debug('PARSING MAIN PAGE');
     const data = $('script[type=\'application/json\'][data-mcom-header-menu-desktop=\'context.header.menu\']')
         .html();
     const departments = JSON.parse(data);
@@ -34,6 +34,7 @@ const parseMainPage = async ({ requestQueue, $ }) => {
 };
 
 const parseCategory = async ({ requestQueue, $, userData }) => {
+    log.debug('PARSING CATEGORY');
     $('.productDetail')
         .each(async (idx, el) => {
             const href = $('.productDescLink', el)
@@ -60,22 +61,35 @@ const parseCategory = async ({ requestQueue, $, userData }) => {
     }
 };
 
-const parseProduct = async (product, apiData) => {
-    const { meta: { analytics: { data } }, product: prod } = product;
+const parseProduct = async (rawProductInfo, apiData) => {
+    log.debug('PARSING PRODUCT');
+    const { meta: { analytics: { data } }, product: prod } = rawProductInfo;
     const colors = prod[0].traits.colors.colorMap;
+    const productInfo = prod[0];
+    const product = {
+        id: productInfo.id,
+        name: productInfo.detail.name,
+        rating: data.product_rating[0],
+        brand: data.product_brand[0],
+        url: BaseUrls.HOME + productInfo.identifier.productUrl,
+        category: productInfo.identifier.toLevelCategoryName,
+        description: productInfo.detail.description,
+        images: productInfo.imagery.images.map((image) => {
+            return BaseUrls.IMAGE + image.filePath;
+        }),
+        apiData: apiData ? rawProductInfo : undefined,
+    };
+    if (!colors) {
+        await Apify.pushData(product);
+        return;
+    }
     await Promise.all(Object.values(colors)
         .map(async (color) => {
             const prices = color.pricing.price.tieredPrice;
             const price = prices.filter(({ label }) => label.includes('Orig'))[0];
             const salePrice = prices.filter(({ label }) => label.includes('Sale'))[0];
-            const p = {
-                id: data.product_id[0],
-                name: data.product_name[0],
-                rating: data.product_rating[0],
-                brand: data.product_brand[0],
-                url: BaseUrls.HOME + prod[0].identifier.productUrl,
-                category: prod[0].identifier.toLevelCategoryName,
-                description: prod[0].detail.description,
+            const productWithColors = {
+                ...product,
                 color: color.name,
                 images: color.imagery.images.map((image) => {
                     return BaseUrls.IMAGE + image.filePath;
@@ -83,9 +97,9 @@ const parseProduct = async (product, apiData) => {
                 sizes: color.sizes,
                 price: price ? price.values[0].value : prices[0].values[0].value,
                 salePrice: salePrice ? salePrice.values[0].value : null,
-                apiData: apiData ? product : undefined,
+                apiData: apiData ? rawProductInfo : undefined,
             };
-            return Apify.pushData(p);
+            return Apify.pushData(productWithColors);
         }));
 };
 
