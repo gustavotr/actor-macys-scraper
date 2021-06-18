@@ -31,24 +31,27 @@
             "description": "<strong>Proxy is required to run this actor!</strong> Either use Apify proxy, or provide your own proxy servers.",
             "prefill": {
                 "useApifyProxy": true,
-                "apifyProxyGroups": [ "SHADER" ]
+                "apifyProxyGroups": ["SHADER"]
             },
             "default": {
                 "useApifyProxy": true,
-                "apifyProxyGroups": [ "SHADER" ]
+                "apifyProxyGroups": ["SHADER"]
             },
             "editor": "proxy"
         },
-        "apiData":{
-            "title":"API Data",
-            "type":"boolean",
-            "description":"Includes data from API",
+        "apiData": {
+            "title": "API Data",
+            "type": "boolean",
+            "description": "Includes data from API",
             "default": false,
             "groupCaption": "Extra"
+        },
+        "debugMode": {
+            "title": "Debug",
+            "type": "boolean",
+            "description": "Enable debug messages",
+            "default": false
         }
     },
-    "required": [
-        "proxy"
-    ]
+    "required": ["proxy"]
 }
-
