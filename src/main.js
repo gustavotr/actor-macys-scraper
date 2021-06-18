@@ -1,7 +1,7 @@
 const Apify = require('apify');
 const cheerio = require('cheerio');
 
-const { getUrlType, log, getSearchUrl, getProductIdFromURL, setDebugMode } = require('./tools');
+const { getUrlType, log, getProductIdFromURL, setDebugMode } = require('./tools');
 const { BaseUrls, EnumURLTypes } = require('./constants');
 const { parseCategory, parseMainPage, parseProduct } = require('./parsers');
 const { createProxyWithValidation } = require('./proxy-validation');
@@ -22,20 +22,11 @@ Apify.main(async () => {
         startUrls.push(BaseUrls.HOME);
     }
 
+    const requestList = await Apify.openRequestList('start-urls', startUrls);
     const requestQueue = await Apify.openRequestQueue();
 
-    if (startUrls && startUrls.length) {
-        await Promise.all(startUrls.map((url) => {
-            const type = getUrlType(url);
-            return requestQueue.addRequest({
-                url,
-                userData: { type },
-            });
-        }));
-    }
-
     if (search) {
-        await requestQueue.addRequest({ url: getSearchUrl(search), userData: { type: EnumURLTypes.SEARCH } });
+        await requestQueue.addRequest({ url: `${BaseUrls.SEARCH}/${search}`, userData: { type: EnumURLTypes.SEARCH } });
     }
 
     const dataset = await Apify.openDataset();
@@ -46,6 +37,7 @@ Apify.main(async () => {
     });
 
     const crawler = new Apify.BasicCrawler({
+        requestList,
         requestQueue,
         useSessionPool: true,
 
@@ -63,7 +55,7 @@ Apify.main(async () => {
                 proxyUrl: proxyConfiguration.newUrl(session.id),
             };
 
-            const { type } = request.userData;
+            const type = getUrlType(request.url);
 
             if (type === EnumURLTypes.PRODUCT) {
                 const productId = getProductIdFromURL(request.url);

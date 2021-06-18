@@ -1,13 +1,9 @@
 const Apify = require('apify');
-const { EnumURLTypes, EnumBaseUrl } = require('./constants');
+const { EnumURLTypes } = require('./constants');
 
 const { log } = Apify.utils;
 
 const setDebugMode = () => log.setLevel(log.LEVELS.DEBUG);
-
-const getSearchUrl = (keyword) => {
-    return `${EnumBaseUrl.SEARCH}/${keyword}`;
-};
 
 const getProductIdFromURL = (productUrl) => {
     const params = new URLSearchParams(productUrl.split('?')[1]);
@@ -37,7 +33,6 @@ const isObject = (val) => typeof val === 'object' && val !== null && !Array.isAr
 
 module.exports = {
     getUrlType,
-    getSearchUrl,
     getProductIdFromURL,
     isObject,
     log,
